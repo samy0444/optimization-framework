@@ -1,228 +1,349 @@
-# ui_app.py (Streamlit)
+# app.py
+import streamlit as st
+import numpy as np
+import time
+import pandas as pd
+# from simulation import simulate_all
+from rl_bo_pipeline.tri_loop import TriLoop
+from layers import Layer
+from benchmark_rl_bo import benchmark_all
+# app.py (Streamlit excerpt)
+from interfaces import Interface
+
+
+
+default_layers = [
+    Layer('Substrate', 1000, 0, 0, 0, 0),
+    Layer('ETL',       50, 1e-12, 0.5, 1e9, 1e-5, mobility=1e-3, band_offset=0.2),
+    Layer('Perov',    400, 1e-12, 0.5, 1e9, 1e-5),
+    Layer('HTL',      100,1e-12, 0.5, 1e9, 1e-5, mobility=5e-4, band_offset=0.3),
+    Layer('Ag',        80,   0,   0,    0,    0),
+]
+st.set_page_config(layout="wide")
+st.title("🔆 Self-Driving Solar Lab Dashboard")
+
+# ────────────────────────────────
+# 1. User‐driven Single Experiment
+# ────────────────────────────────
+st.sidebar.header("1. Manual Fabrication")
+
+cs = st.sidebar.slider("Cs fraction", 0.0, 1.0, 0.33, 0.01)
+ma = st.sidebar.slider("MA fraction", 0.0, 1.0 - cs, 0.33, 0.01)
+fa = 1.0 - cs - ma
+st.sidebar.markdown(f"**FA fraction** = {fa:.2f}")
+
+spin = st.sidebar.slider("Spin speed (rpm)", 1000, 6000, 3500, 100)
+anneal = st.sidebar.slider("Anneal temp (°C)", 50, 200, 125, 5)
+uv = st.sidebar.slider("UV filter strength", 0.0, 1.0, 0.5, 0.01)
+encap = st.sidebar.checkbox("Encapsulation", value=False)
+
+etl_if  = Interface(name="ETL/Perovskite", recomb_velocity=1e3, trap_density=1e10)
+perh_if = Interface(name="Perovskite/HTL", recomb_velocity=5e2, trap_density=5e9)
+
+
+
+if st.sidebar.button("Run Simulation"):
+    with st.spinner("Simulating…"):
+        params = {
+            "layers": default_layers, 
+            "composition": {"Cs": cs, "MA": ma, "FA": fa},
+            "uv_filter": uv,
+            "spin_speed": spin,
+            "anneal_T": anneal,
+            "substrate": "Glass",
+            "encapsulation": encap,
+            "interfaces": [etl_if, perh_if]
+        }
+        res = simulate_all(params)
+    st.metric("💡 Efficiency", f"{res['efficiency']:.3f}")
+    st.metric("⏳ log₁₀(Lifetime)", f"{res['log_lifetime']:.3f}")
+
+# ────────────────────────────────────
+# 2. Closed‐Loop BO + RL “Tri-Loop”
+# ────────────────────────────────────
+st.sidebar.header("2. Automated BO + RL Optimization")
+
+n_cycles   = st.sidebar.number_input("BO+RL cycles", min_value=1, max_value=20, value=5)
+batch_size = st.sidebar.number_input("Compositions per cycle", min_value=1, max_value=10, value=3)
+rl_steps   = st.sidebar.number_input("RL timesteps", min_value=1000, max_value=100_000, value=20_000, step=1000)
+
+if st.sidebar.button("Run Tri-Loop"):
+    # placeholders for dynamic updates
+    chart_pl = st.empty()
+    table_pl = st.empty()
+    progress  = st.progress(0)
+    loop = TriLoop(data_root="cluster-perovskite-data/Data", bo_device="cpu")
+
+    history = []
+    for c in range(n_cycles):
+        # run one cycle: suggest + train + evaluate
+        cycle_results = loop.run_cycle(cycle=c, bo_batch=batch_size, rl_steps=rl_steps)
+        history.extend(cycle_results)
+
+        # render table of all results so far
+        df = pd.DataFrame(history)
+        table_pl.dataframe(df[["cycle","composition","eff","log_life"]])
+
+        # plot live
+        df_plot = (df
+            .assign(eff=df["eff"], log_life=df["log_life"])
+            .groupby("cycle")[["eff","log_life"]]
+            .max()
+            .reset_index()
+            .set_index("cycle")
+        )
+        chart_pl.line_chart(df_plot)
+
+        progress.progress((c+1)/n_cycles)
+
+    st.success("✅ Optimization complete!")
+
+
+
+# if st.sidebar.button("Run Benchmarks"):
+#     import altair as alt
+#     st.info("Running all four benchmarking strategies… this may take a while.")
+#     start = time.time()
+#     df_bench = benchmark_all(
+#         total_cycles=int(n_cycles),
+#         bo_batch=int(batch_size),
+#         rl_steps=int(rl_steps),
+#         random_seed=42
+#     )
+#     st.success(f"Done in {time.time()-start:.1f}s")
+
+#     # Convert to “long” form for Altair
+#     df_long = df_bench.reset_index().melt(
+#         id_vars="index", 
+#         var_name="method", 
+#         value_name="score"
+#     ).rename(columns={"index": "cycle"})
+
+#     # Build Altair chart
+#     chart = (
+#         alt.Chart(df_long)
+#         .mark_line(point=True)
+#         .encode(
+#             x=alt.X("cycle:Q", title="Cycle"),
+#             y=alt.Y("score:Q", title="Efficiency × Lifetime"),
+#             color=alt.Color("method:N", title="Strategy"),
+#             tooltip=["cycle", "method", "score"]
+#         )
+#         .properties(
+#             width=700,
+#             height=400,
+#             title="Convergence Comparison"
+#         )
+#     )
+#     st.altair_chart(chart, use_container_width=True)
+
+#     st.subheader("Raw Data")
+#     st.dataframe(df_bench)
+
+#     # Cycles‐to‐threshold table...
+
+#     # Optionally compute how many cycles to exceed threshold
+#     threshold = st.sidebar.number_input("Performance threshold (eff×life)", 0.0, 5.0, 1.0, 0.1)
+#     secs = []
+#     for col in df_bench.columns:
+#         reached = df_bench[col].ge(threshold).idxmax() if (df_bench[col] >= threshold).any() else None
+#         secs.append(reached)
+#     df_t = pd.DataFrame({"method":df_bench.columns, "cycles_to_threshold":secs})
+#     st.subheader(f"Cycles to reach eff×life ≥ {threshold:.1f}")
+#     st.table(df_t)
+
 import streamlit as st
 import pandas as pd
-from optimization_bo import run_bo
-from train_rl import train
-from environment import FabricationEnv
-from stable_baselines3 import PPO
-from surrogate_model import SurrogateModel
-from stable_baselines3 import SAC
-# from stable_baselines3 import A2C
-from validation.validate_agent import validate_virtual_lab
-from simulation import simulate_all
-from noisy_simulation.noisy_wrapper import NoisySimulator 
-import streamlit as st
+import numpy as np
+import altair as alt
+import time
 
+from benchmark_rl_bo import benchmark_all  # the function we defined earlier
 
+# if st.sidebar.button("Run Enhanced Benchmarks"):
+#     st.info("Running enhanced benchmarking (this can take a bit)…")
+#     start = time.time()
 
-
-st.title("Self‑Driving Solar Lab Simulator")
-b_iters=st.sidebar.slider("BO iterations",5,50,20)
-init_size=st.sidebar.number_input("Initial DOE size",5,50,20)
-rl_steps=st.sidebar.slider("RL timesteps",1000,100000,20000)
-surrogate = SurrogateModel(device="cpu")
-if st.sidebar.button("Run BO"):
-    st.info("Running multi‑objective BO…")
-    hist=run_bo(b_iters, init_size)
-    df=pd.DataFrame(hist, columns=["Best Eff","Best Log‑Life"] )
-    st.line_chart(df)
-
-# usage in ui_app.py (Streamlit)
-
-if st.sidebar.button("Run Hierarchical BO"):
-    from rl_bo_pipeline.physics_informed_optimization_bo import run_bo
-    st.info("Running material-level BO + device sampling…")
-    comp_hist, inst_hist = run_bo(
-        num_rounds=5,
-        material_batch=10
-    )
-    st.write("Material compositions suggested each round:")
-    for i, (comps, insts) in enumerate(zip(comp_hist, inst_hist)):
-        st.write(f"Round {i+1}:")
-        df = pd.DataFrame({
-            "Cs": comps[:,0],
-            "MA": comps[:,1],
-            "FA": comps[:,2],
-            "pred_log10_life": insts
-        })
-        st.dataframe(df)
-
-
-# if st.sidebar.button("Run Hierarchical BO"):
-#     from physics_informed_optimization_bo import run_bo
-#     st.info("Running material-level BO + device sampling…")
-#     comp_hist, inst_hist = run_bo(
-#         num_rounds=5,
-#         material_batch=10
-#     )
-#     st.write("Material compositions suggested each round:")
-#     for i,(comps,insts) in enumerate(zip(comp_hist, inst_hist)):
-#         st.write(f"Round {i+1}:")
-#         st.dataframe({
-#             "Cs": comps[:,0],
-#             "MA": comps[:,1],
-#             "FA": comps[:,2],
-#             "instability": insts
-#         })
-
-
-
-def anneal_time_penalty(T):
-    return 0.1 * (T / 100.0)
-if st.sidebar.button("Train RL"):
-    st.info("Training RL policy…")
-    # train(rl_steps)
-    # validate_virtual_lab()
-    # 1) train and grab the agent
-    agent = train(rl_steps)
-
-    # 2) build the same noisy‐simulator you use elsewhere
-
-
-    sim = NoisySimulator(simulate_all, noise_level=0.05,
-                         time_penalties={"anneal_T": anneal_time_penalty})
-
-    # 3) validate your lab loop
-    score = validate_virtual_lab(agent, sim)
-    st.write(f"Validation success rate: {score*100:.1f}%")
-    st.success("RL done")
-
-if st.sidebar.button("Demo RL"):
-    env=FabricationEnv()
-    model=SAC.load("sac_fab_cont", env=env)
-    
-    obs=env.reset()
-    for i in range(6):
-        action,_=model.predict(obs)
-        obs, r, done, info=env.step(action)
-        st.write(f"Stage {i}: action={action}")
-    st.write("Result:", info)
-
-
-# if st.sidebar.button("Run Digital-Twin"):
-#     st.info("Running digital‐twin closed‐loop…")
-#     # load or initialize
-#     from orchestrator.closed_loop import DigitalTwinLoop
-#     from noisy_simulation.noisy_wrapper import NoisySimulator
-#     from surrogate_model import SurrogateModel
-#     from train_rl import train  # to get agent
-
-#     # 1) seed data_pool from some initial random experiments
-#     data_pool = initial_random_data(100)
-
-#     # 2) build sim & surrogate & agent
-#     base_sim = simulate_all
-#     sim = NoisySimulator(base_sim, noise_level=0.05,
-#                          time_penalties={"anneal_T": anneal_time_penalty})
-#     surrogate = SurrogateModel(device="cpu")
-#     agent = SAC.load("sac_fab_cont", env=env)r train(rl_steps)
-
-#     # 3) run a few closed-loop cycles
-#     loop = DigitalTwinLoop(agent, sim, surrogate, batch_size=32)
-#     metrics = []
-#     for cycle in range(5):
-#         data_pool = loop.run_cycle(data_pool)
-#         metrics.append((cycle,
-#                         data_pool.efficiency.max(),
-#                         data_pool.log_lifetime.max()))
-#     df = pd.DataFrame(metrics, columns=["cycle","best_eff","best_life"])
-#     st.line_chart(df.set_index("cycle"))
-
-
-if st.sidebar.button("Run Digital-Twin"):
-    st.info("Running digital-twin closed-loop…")
-    from orchestrator.closed_loop import DigitalTwinLoop
-    from noisy_simulation.noisy_wrapper import NoisySimulator
-    from surrogate_model import SurrogateModel
-    from train_rl import train
-    from orchestrator.utils import initial_random_data  # <-- import it
-    env=FabricationEnv()
-    data_pool = initial_random_data(100)
-
-    sim = NoisySimulator(simulate_all,
-                         noise_level=0.05,
-                         time_penalties={"anneal_T": anneal_time_penalty})
-    surrogate = SurrogateModel(device="cpu")
-    agent = SAC.load("sac_fab_cont", env=env)
-
-    # loop = DigitalTwinLoop(agent, sim, surrogate, batch_size=32)
-    # new:
-    loop = DigitalTwinLoop(agent, sim, batch_size=32)
-
-    metrics = []
-    for cycle in range(1):
-        data_pool = loop.run_cycle(data_pool)
-        metrics.append((cycle,
-                        data_pool.efficiency.max(),
-                        data_pool.log_lifetime.max()))
-    df = pd.DataFrame(metrics, columns=["cycle", "best_eff", "best_life"])
-    st.line_chart(df.set_index("cycle"))
-
-
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3 import PPO
-from environment import FabricationEnv
-
-if st.sidebar.button("Evaluate RL"):
-    env=FabricationEnv()
-    st.info("Evaluating trained policy over 30 episodes…")
-    # 1) Load your saved model
-    model = SAC.load("sac_fab_cont", env=env)
-
-    # 2) Create a fresh environment
-    env = FabricationEnv()
-
-    # 3) Run 30 full episodes, return mean & std of total episode reward
-    mean_reward, std_reward = evaluate_policy(
-        model,
-        env,
-        n_eval_episodes=30,
-        deterministic=True,       # use deterministic actions (no random sampling)
-        render=False,             # set True if you want to visualize
-    )
-
-    st.success(f"Mean reward over 30 episodes: {mean_reward:.2f} ± {std_reward:.2f}")
-
-# app.py snippet
-
-from rl_bo_pipeline.tri_loop import TriLoop
-# loop = TriLoop()\# history = loop.run(num_cycles=3, bo_batch=5, rl_steps=10000)
-
-
-if st.sidebar.button("Run Tri‐Loop"):
-    st.info("Running BO + RL closed loop…")
-    loop = TriLoop()
-    history = loop.run(num_cycles=3, bo_batch=5, rl_steps=10000)
-    # hist = tri_loop(num_cycles=3, bo_batch=3, rl_steps=10000)
-    df = pd.DataFrame(history)
-    st.write(df)
-    st.line_chart(df.set_index("cycle")[["eff","log_life"]])
-
-
-if st.sidebar.button("Run Benchmarks"):
-    st.info("Running all four benchmarking strategies… this may take a while.")
+#     total_cycles = int(n_cycles)
+#     bo_batch     = int(batch_size)
+#     rl_steps     = int(rl_steps)
+#     n_repeats    = 5  # or however many you want
+if st.sidebar.button("Run Enhanced Benchmarks"):
+    st.info("Running robust benchmarking… this may take a minute.")
     start = time.time()
-    df_bench = benchmark_all(
-        total_cycles=int(n_cycles),
-        bo_batch=int(batch_size),
-        rl_steps=int(rl_steps),
-        random_seed=42
+
+    # publication-ready settings:
+    total_cycles = int(n_cycles)       # from sidebar, e.g. 10
+    bo_batch     = int(batch_size)     # e.g. 5
+    rl_steps     = int(rl_steps)       # e.g. 50000
+    n_repeats    = 1                # do 10 independent trials
+    seed         = 42                # keep it reproducible
+
+    # run
+    results, stats, df_mean = benchmark_all(
+        total_cycles=total_cycles,
+        bo_batch=bo_batch,
+        rl_steps=rl_steps,
+        n_repeats=n_repeats,
+        seed=seed,
     )
-    st.success(f"Done in {time.time()-start:.1f}s")
 
-    st.subheader("Convergence Comparison")
-    st.line_chart(df_bench)
+    st.success(f"Done in {(time.time()-start):.1f}s")
 
-    st.subheader("Raw Data")
-    st.dataframe(df_bench)
+    # plot mean ± std with Altair (code you already have)…
+    # show df_mean, cycles-to-threshold, etc.
 
-    # Optionally compute how many cycles to exceed threshold
-    threshold = st.sidebar.number_input("Performance threshold (eff×life)", 0.0, 5.0, 1.0, 0.1)
-    secs = []
-    for col in df_bench.columns:
-        reached = df_bench[col].ge(threshold).idxmax() if (df_bench[col] >= threshold).any() else None
-        secs.append(reached)
-    df_t = pd.DataFrame({"method":df_bench.columns, "cycles_to_threshold":secs})
-    st.subheader(f"Cycles to reach eff×life ≥ {threshold:.1f}")
-    st.table(df_t)
 
+    # returns raw results, stats (mean/std), and a df of means
+    # results, stats, df_mean = benchmark_all(
+    #     total_cycles, bo_batch, rl_steps, n_repeats=n_repeats
+    # )
+    # duration = time.time() - start
+    # st.success(f"Done in {duration:.1f}s")
+
+    # Build a DataFrame for plotting mean ± std
+    plot_df = []
+    strategies = list(stats.keys())
+    for strat in strategies:
+        mean = stats[strat]["mean"]
+        std  = stats[strat]["std"]
+        for cycle in range(total_cycles):
+            plot_df.append({
+                "strategy": strat,
+                "cycle":     cycle + 1,
+                "mean":      mean[cycle],
+                "lower":     mean[cycle] - std[cycle],
+                "upper":     mean[cycle] + std[cycle],
+            })
+    df_plot = pd.DataFrame(plot_df)
+
+    # Altair chart: band for ±1 std and line for mean
+    base = alt.Chart(df_plot).encode(
+        x=alt.X("cycle:Q", title="Cycle"),
+        color=alt.Color("strategy:N", title="Method")
+    )
+
+    band = base.mark_area(opacity=0.2).encode(
+        y="lower:Q",
+        y2="upper:Q"
+    )
+
+    line = base.mark_line(point=True).encode(
+        y=alt.Y("mean:Q", title="Efficiency × Lifetime")
+    )
+
+    chart = (band + line).properties(
+        width=700,
+        height=400,
+        title="Benchmark Convergence (mean ± 1 std over repeats)"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+    # Show raw mean table and cycles-to-threshold
+    st.subheader("Mean Performance by Cycle")
+    st.dataframe(df_mean)
+
+    threshold = st.sidebar.number_input(
+        "Threshold (eff × life)", 0.0, 5.0, 1.0, 0.1
+    )
+    hits = []
+    for strat in strategies:
+        times = []
+        for rep in range(n_repeats):
+            arr = results[strat][rep]
+            hit = np.argmax(arr >= threshold) + 1 if np.any(arr >= threshold) else np.inf
+            times.append(hit)
+        hits.append({
+            "method": strat,
+            "mean_cycles_to_threshold": np.mean(times),
+            "std_cycles_to_threshold":  np.std(times),
+        })
+    df_hits = pd.DataFrame(hits)
+    st.subheader(f"Cycles to reach ≥ {threshold:.2f}")
+    st.table(df_hits)
+
+
+# ────────────────────────────────
+# 3. Summary of Best Recipe
+# ────────────────────────────────
+st.header("🏆 Best Overall Recipe Found")
+if 'history' in locals() and history:
+    best = max(history, key=lambda x: (x["eff"], x["log_life"]))
+    comp = best["composition"]
+    st.markdown(f"**Composition:** Cs={comp['Cs']:.2f}, MA={comp['MA']:.2f}, FA={comp['FA']:.2f}")
+    st.markdown(f"**Efficiency:** {best['eff']:.3f}")
+    st.markdown(f"**log₁₀(Lifetime):** {best['log_life']:.3f}")
+else:
+    st.write("Run the Tri-Loop above to see results here.")
+
+# ────────────────────────────────
+# Utility: ensure default_layers is available
+# ────────────────────────────────
+# In rl_bo_pipeline/tri_loop.py add:
+#
+#   @staticmethod
+#   def default_layers():
+#       from layers import Layer
+#       return [
+#           Layer("Substrate", 1000,0,0,0,0),
+#           Layer("ETL",      50,1e-12,0.5,1e9,1e-5),
+#           Layer("Perov",   400,1e-12,0.5,1e9,1e-5),
+#           Layer("HTL",     100,1e-12,0.5,1e9,1e-5),
+#           Layer("Ag",       80,0,0,0,0),
+#       ]
+
+if st.sidebar.button("Run Enhanced Benchmarks-2"):
+    from benchmark_all import benchmark_multiple_runs
+    st.info("Running robust benchmarking… this may take a minute.")
+    start = time.time()
+
+    # publication-ready settings:
+    total_cycles = int(n_cycles)       # from sidebar, e.g. 10
+    bo_batch     = int(batch_size)     # e.g. 5
+    rl_steps     = int(rl_steps)       # e.g. 50000
+    n_repeats    = 1                # do 10 independent trials
+    seed         = 42                # keep it reproducible  
+    # Run multiple benchmarks to gather statistics
+    stats_df = benchmark_multiple_runs(num_runs=n_repeats, total_cycles=total_cycles, bo_batch=bo_batch, rl_steps=rl_steps)
+    # results, stats, df_mean = benchmark_all(
+    #     total_cycles=total_cycles,
+    #     bo_batch=bo_batch,
+    #     rl_steps=rl_steps,
+    #     n_repeats=n_repeats,
+    #     seed=seed,
+    # )
+    # Prepare data for Altair: one row per (cycle, method) with mean and std
+    plot_data = stats_df.melt(id_vars="cycle", 
+                            value_vars=["random_mean","bo_only_mean","rl_only_mean","tri_loop_mean",
+                                        "random_std","bo_only_std","rl_only_std","tri_loop_std"],
+                            var_name="metric", value_name="value")
+    # Separate method and statistic from 'metric'
+    plot_data[["method","stat"]] = plot_data["metric"].str.rsplit("_", n=1, expand=True)
+    plot_data = plot_data.pivot_table(index=["cycle","method"], columns="stat", values="value").reset_index()
+
+    # Plot mean with error band
+    import altair as alt
+    base = alt.Chart(plot_data).encode(
+        x=alt.X("cycle:Q", title="Cycle"),
+        color=alt.Color("method:N", title="Strategy")
+    )
+    # mean_line = base.mark_line().encode(y=alt.Y("mean:Q", title="Eff × Life (mean)"))
+    # error_band = base.mark_errorband(opacity=0.3).encode(
+    #     y=alt.Y("mean:Q"), yError=alt.Y("std:Q")  # mean and std define the band
+    # )
+    # chart = (mean_line + error_band).properties(title="Benchmark Convergence with 1σ Error Bands")
+    # after
+    mean_line = base.mark_line().encode(
+        y="mean:Q",            # shorthand; Altair infers the type
+        tooltip=["method:N","cycle:Q","mean:Q","std:Q"]
+    )
+    error_band = base.mark_errorband(opacity=0.3).encode(
+        y="mean:Q",
+        yError="std:Q"
+    )
+    chart = (mean_line + error_band).properties(
+        title="Benchmark Convergence with 1σ Error Bands"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
