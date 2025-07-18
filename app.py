@@ -7,8 +7,10 @@ import pandas as pd
 from rl_bo_pipeline.tri_loop import TriLoop
 from layers import Layer
 from benchmark_rl_bo import benchmark_all
-# app.py (Streamlit excerpt)
+
 from interfaces import Interface
+
+import altair as alt
 
 
 
@@ -100,73 +102,7 @@ if st.sidebar.button("Run Tri-Loop"):
 
 
 
-# if st.sidebar.button("Run Benchmarks"):
-#     import altair as alt
-#     st.info("Running all four benchmarking strategies… this may take a while.")
-#     start = time.time()
-#     df_bench = benchmark_all(
-#         total_cycles=int(n_cycles),
-#         bo_batch=int(batch_size),
-#         rl_steps=int(rl_steps),
-#         random_seed=42
-#     )
-#     st.success(f"Done in {time.time()-start:.1f}s")
 
-#     # Convert to “long” form for Altair
-#     df_long = df_bench.reset_index().melt(
-#         id_vars="index", 
-#         var_name="method", 
-#         value_name="score"
-#     ).rename(columns={"index": "cycle"})
-
-#     # Build Altair chart
-#     chart = (
-#         alt.Chart(df_long)
-#         .mark_line(point=True)
-#         .encode(
-#             x=alt.X("cycle:Q", title="Cycle"),
-#             y=alt.Y("score:Q", title="Efficiency × Lifetime"),
-#             color=alt.Color("method:N", title="Strategy"),
-#             tooltip=["cycle", "method", "score"]
-#         )
-#         .properties(
-#             width=700,
-#             height=400,
-#             title="Convergence Comparison"
-#         )
-#     )
-#     st.altair_chart(chart, use_container_width=True)
-
-#     st.subheader("Raw Data")
-#     st.dataframe(df_bench)
-
-#     # Cycles‐to‐threshold table...
-
-#     # Optionally compute how many cycles to exceed threshold
-#     threshold = st.sidebar.number_input("Performance threshold (eff×life)", 0.0, 5.0, 1.0, 0.1)
-#     secs = []
-#     for col in df_bench.columns:
-#         reached = df_bench[col].ge(threshold).idxmax() if (df_bench[col] >= threshold).any() else None
-#         secs.append(reached)
-#     df_t = pd.DataFrame({"method":df_bench.columns, "cycles_to_threshold":secs})
-#     st.subheader(f"Cycles to reach eff×life ≥ {threshold:.1f}")
-#     st.table(df_t)
-
-import streamlit as st
-import pandas as pd
-import numpy as np
-import altair as alt
-import time
-
-from benchmark_rl_bo import benchmark_all  # the function we defined earlier
-
-# if st.sidebar.button("Run Enhanced Benchmarks"):
-#     st.info("Running enhanced benchmarking (this can take a bit)…")
-#     start = time.time()
-
-#     total_cycles = int(n_cycles)
-#     bo_batch     = int(batch_size)
-#     rl_steps     = int(rl_steps)
 #     n_repeats    = 5  # or however many you want
 if st.sidebar.button("Run Enhanced Benchmarks"):
     st.info("Running robust benchmarking… this may take a minute.")
@@ -190,16 +126,7 @@ if st.sidebar.button("Run Enhanced Benchmarks"):
 
     st.success(f"Done in {(time.time()-start):.1f}s")
 
-    # plot mean ± std with Altair (code you already have)…
-    # show df_mean, cycles-to-threshold, etc.
 
-
-    # returns raw results, stats (mean/std), and a df of means
-    # results, stats, df_mean = benchmark_all(
-    #     total_cycles, bo_batch, rl_steps, n_repeats=n_repeats
-    # )
-    # duration = time.time() - start
-    # st.success(f"Done in {duration:.1f}s")
 
     # Build a DataFrame for plotting mean ± std
     plot_df = []
@@ -276,74 +203,3 @@ if 'history' in locals() and history:
     st.markdown(f"**log₁₀(Lifetime):** {best['log_life']:.3f}")
 else:
     st.write("Run the Tri-Loop above to see results here.")
-
-# ────────────────────────────────
-# Utility: ensure default_layers is available
-# ────────────────────────────────
-# In rl_bo_pipeline/tri_loop.py add:
-#
-#   @staticmethod
-#   def default_layers():
-#       from layers import Layer
-#       return [
-#           Layer("Substrate", 1000,0,0,0,0),
-#           Layer("ETL",      50,1e-12,0.5,1e9,1e-5),
-#           Layer("Perov",   400,1e-12,0.5,1e9,1e-5),
-#           Layer("HTL",     100,1e-12,0.5,1e9,1e-5),
-#           Layer("Ag",       80,0,0,0,0),
-#       ]
-
-if st.sidebar.button("Run Enhanced Benchmarks-2"):
-    from benchmark_all import benchmark_multiple_runs
-    st.info("Running robust benchmarking… this may take a minute.")
-    start = time.time()
-
-    # publication-ready settings:
-    total_cycles = int(n_cycles)       # from sidebar, e.g. 10
-    bo_batch     = int(batch_size)     # e.g. 5
-    rl_steps     = int(rl_steps)       # e.g. 50000
-    n_repeats    = 1                # do 10 independent trials
-    seed         = 42                # keep it reproducible  
-    # Run multiple benchmarks to gather statistics
-    stats_df = benchmark_multiple_runs(num_runs=n_repeats, total_cycles=total_cycles, bo_batch=bo_batch, rl_steps=rl_steps)
-    # results, stats, df_mean = benchmark_all(
-    #     total_cycles=total_cycles,
-    #     bo_batch=bo_batch,
-    #     rl_steps=rl_steps,
-    #     n_repeats=n_repeats,
-    #     seed=seed,
-    # )
-    # Prepare data for Altair: one row per (cycle, method) with mean and std
-    plot_data = stats_df.melt(id_vars="cycle", 
-                            value_vars=["random_mean","bo_only_mean","rl_only_mean","tri_loop_mean",
-                                        "random_std","bo_only_std","rl_only_std","tri_loop_std"],
-                            var_name="metric", value_name="value")
-    # Separate method and statistic from 'metric'
-    plot_data[["method","stat"]] = plot_data["metric"].str.rsplit("_", n=1, expand=True)
-    plot_data = plot_data.pivot_table(index=["cycle","method"], columns="stat", values="value").reset_index()
-
-    # Plot mean with error band
-    import altair as alt
-    base = alt.Chart(plot_data).encode(
-        x=alt.X("cycle:Q", title="Cycle"),
-        color=alt.Color("method:N", title="Strategy")
-    )
-    # mean_line = base.mark_line().encode(y=alt.Y("mean:Q", title="Eff × Life (mean)"))
-    # error_band = base.mark_errorband(opacity=0.3).encode(
-    #     y=alt.Y("mean:Q"), yError=alt.Y("std:Q")  # mean and std define the band
-    # )
-    # chart = (mean_line + error_band).properties(title="Benchmark Convergence with 1σ Error Bands")
-    # after
-    mean_line = base.mark_line().encode(
-        y="mean:Q",            # shorthand; Altair infers the type
-        tooltip=["method:N","cycle:Q","mean:Q","std:Q"]
-    )
-    error_band = base.mark_errorband(opacity=0.3).encode(
-        y="mean:Q",
-        yError="std:Q"
-    )
-    chart = (mean_line + error_band).properties(
-        title="Benchmark Convergence with 1σ Error Bands"
-    )
-
-    st.altair_chart(chart, use_container_width=True)
