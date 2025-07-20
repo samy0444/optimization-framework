@@ -1,10 +1,10 @@
-# Self-Driving Solar Lab: Autonomous Optimization Framework for Perovskite Solar Cells
+# Autonomous Optimization Framework: Self-Driving Solar Lab for Perovskite Solar Cells
 
 ---
 
 ## Overview
 
-This repository presents a sophisticated, autonomous optimization framework designed for perovskite solar cell fabrication. It integrates cutting-edge techniques such as physics-informed surrogate modeling, Bayesian optimization (BO), reinforcement learning (RL), and generative AI to simulate a self-driving laboratory. The framework autonomously identifies optimal, stable, and high-efficiency solar cell compositions and fabrication processes, significantly accelerating discovery and development.
+This repository contains an advanced, autonomous optimization platform intended for perovskite solar cell production. It combines state-of-the-art methods like physics-informed surrogate modeling, Bayesian optimization (BO), reinforcement learning (RL), and generative AI to mimic a self-driving laboratory. The platform automatically finds best, stable, and high-efficiency solar cell compositions and production processes, greatly speeding up discovery and development.
 
 ---
 
@@ -13,18 +13,18 @@ This repository presents a sophisticated, autonomous optimization framework desi
 ```
 ├── app.py                      # Streamlit UI for interactive optimization and benchmarking
 ├── layers.py                   # Solar cell layer properties and configurations
-├── interfaces.py               # Interface recombination parameters
+├── interfaces.py               # Recombination parameters for the interface
 ├── simulation.py               # Physics-informed surrogate simulation model
-├── benchmark_rl_bo.py          # Robust benchmarking script comparing multiple optimization methods
-├── train_base_agent_rl_bo.py   # Reinforcement learning agents trained on representative solar cell compositions
+├── benchmark_rl_bo.py          # Resilient benchmarking script comparing various optimization approaches
+├── train_base_agent_rl_bo.py   # Reinforcement learning agents trained on typical solar cell compositions
 ├── rl_bo_pipeline/
 │   ├── tri_loop.py             # Tri-level optimization loop (BO-RL integration)
-│   ├── physics_informed_bo.py  # Bayesian optimization enhanced by physics-informed surrogates
-│   ├── evaluate_fixed_comp.py  # Evaluation of RL agents on predefined compositions
+│   ├── physics_informed_bo.py  # Bayesian optimization aided by physics-informed surrogates
+│   ├── evaluate_fixed_comp.py  # Test of RL agents on fixed compositions
 ├── data
-│   ├── cluster-perovskite-data # Comprehensive experimental dataset (MIT)
-│   ├── perovskitedatabase_data # Literature-sourced dataset (NREL)
-│   └── heldout_testdata        # Independent validation dataset for surrogate model
+│   ├── cluster-perovskite-data # MIT comprehensive experimental dataset
+│   ├── perovskitedatabase_data # Literature-based dataset (NREL)
+│   └── heldout_testdata        # Surrogate model independent validation dataset
 ├── models/
 │   ├── surrogate.pt            # Pre-trained surrogate checkpoint
 │   ├── hybrid_efficiency_surrogate.pt    # Efficiency surrogate model
@@ -40,28 +40,28 @@ This repository presents a sophisticated, autonomous optimization framework desi
 
 ### 1. Physics-Informed Surrogate Modeling
 
-* **Objective:** Efficiently predict solar cell efficiency and lifetime without exhaustive experiments.
+* **Objective:** Cost-effective prediction of solar cell efficiency and lifetime without extensive experiments.
 * **Features:** Composition, layer structures, process parameters (spin speed, annealing temperature, encapsulation).
-* **Outputs:** Predicted cell efficiency and stability (log-lifetime).
-* **Methodology:** Advanced neural network surrogate trained on synthetic physics simulations (SCAPS, Quantum ESPRESSO proxies) and validated with real-world MIT experimental datasets.
+* **Outputs:** Estimated cell efficiency and stability (log-lifetime).
+* **Methodology:** High-performance neural network surrogate, which was trained on synthetic physics simulations (SCAPS, Quantum ESPRESSO proxies) and tested against experimental MIT datasets.
 
 ### 2. Bayesian Optimization (BO)
 
-* **Goal:** Systematically explore novel compositions to identify promising candidates.
-* **Approach:**
+* **Objective:** Methodically scan new compositions to discover promising candidates.
+* **Method:**
 
-  * Gaussian Process regression using targeted acquisition functions (e.g., Expected Improvement).
-  * Integration of physics-informed priors to enhance realistic prediction capabilities.
+  * Gaussian Process regression with focused acquisition functions (e.g., Expected Improvement).
+  * Use of physics-informed priors to make more realistic prediction abilities.
 
 ### 3. Reinforcement Learning (RL)
 
-* **Purpose:** Precisely optimize fabrication parameters (e.g., spin coating speed, annealing temperature).
-* **Method:** Soft Actor-Critic (SAC) algorithm trained on compositions recommended by BO to maximize efficiency × lifetime.
+* **Goal:** Accurately optimize fabrication parameters (e.g., spin coating rate, annealing temperature).
+* **Procedure:** Soft Actor-Critic (SAC) algorithm learned on compositions proposed by BO to maximize efficiency × lifetime.
 
 ### 4. Integrated Tri-Loop Optimization
 
-* Iterative feedback loop: Bayesian optimization suggests compositions → Reinforcement learning refines fabrication processes → Surrogate evaluation informs subsequent optimization cycles.
-* Continuous autonomous refinement and progressive performance enhancement toward stable, high-efficiency solar cells.
+* Iterative feedback loop: Bayesian optimization proposes compositions → Reinforcement learning optimizes fabrication processes → Surrogate evaluation guides next optimization cycles.
+* Progressive autonomous refinement and continuous improvement toward stable, high-efficiency solar cells.
 
 ---
 
@@ -70,8 +70,8 @@ This repository presents a sophisticated, autonomous optimization framework desi
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/samy0444/self-driving-solar-lab.git
-cd self-driving-solar-lab
+git clone https://github.com/samy0444/optimization-framework.git
+cd optimization-framework
 pip install -r requirements.txt
 ```
 
@@ -87,30 +87,30 @@ streamlit run app.py
 
 ### Dashboard Capabilities
 
-* **Manual Simulation:** Rapidly assess individual solar cell recipes.
-* **Automated Optimization:** Perform autonomous optimization loops combining BO and RL.
-* **Comprehensive Benchmarking:** Execute statistical and visual analysis of different optimization strategies.
+* **Manual Simulation:** Quickly evaluate individual solar cell recipes.
+* **Automated Optimization:** Run autonomous optimization loops based on BO and RL.
+* **Comprehensive Benchmarking:** Run statistical and visual examination of various optimization approaches.
 
 ---
 
 ## Robust Benchmarking
 
-The benchmarking rigorously compares optimization strategies, ensuring statistical significance and robustness:
+The benchmarking rigorously compares optimization strategies to ensure statistical significance and robustness:
 
 * Random Search
 * Bayesian Optimization (BO-only)
 * Reinforcement Learning (RL-only)
-* Tri-Loop Optimization (combined BO and RL)
+* Tri-Loop Optimization (BO+RL)
 
 ### Benchmark Methodology
 
-* Conduct multiple independent repetitions for reliable statistics.
-* Present mean performance, standard deviation, and statistical significance analysis (t-tests).
-* Metrics: convergence rate, achieved efficiency, and lifetime stability.
+* Make several independent repetitions for robust statistics.
+* Report mean performance, standard deviation, and statistical significance test (t-tests).
+* Measures: convergence rate, realized efficiency, and lifetime stability.
 
 ### Benchmark Visualization
 
-Streamlit-based visualization features:
+Streamlit-based visualization capabilities:
 
 * Error-band convergence plots.
 * Statistical comparison and significance tests.
@@ -118,34 +118,35 @@ Streamlit-based visualization features:
 
 ---
 
+
 ## Pipeline Workflow Diagram
 
 ```
-+-------------------+      +---------------------------+
-|  Composition BO   | ---> |  Reinforcement Learning   |
++-------------------+      +---------------------------
+```
+|  BO Composition   | ---> |  Reinforcement Learning   |
 | (Gaussian Process)| <--- |     (SAC Fine-tuning)     |
 +-------------------+      +---------------------------+
-         ^                              |
-         |                              v
-+-------------------+      +---------------------------+
+^                              |
+|                              v
++-------------------+
 |  Physics-Informed | ---> |    Fabrication Process    |
-| Surrogate Network |      | (Spin Speed, Annealing..) |
+| Surrogate Network |      | (Spin Speed, Annealing.) |
 +-------------------+      +---------------------------+
-```
 
 ---
 
 ## Surrogate Model Validation
 
-Rigorous validation ensures strong generalization:
+High-quality validation provides solid generalization:
 
 | Surrogate      | RMSE  | R²    |
 | -------------- | ----- | ----- |
 | **Lifetime**   | 0.108 | 0.985 |
 | **Efficiency** | 3.728 | 0.712 |
 
-* **Lifetime surrogate** achieves near-perfect generalization with R² \~ 0.99.
-* **Efficiency surrogate** provides robust predictions with RMSE \~3.7% and R² \~0.71, notably strong given inherent experimental variability.
+* **Lifetime surrogate** results in nearly perfect overall generalization with R² \~ 0.99.
+* **Efficiency surrogate** gives stable predictions with RMSE \~3.7% and R² \~ 0.71, considerably high considering inherent experimental volatility.
 
 ---
 
