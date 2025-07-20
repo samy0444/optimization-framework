@@ -122,19 +122,17 @@ Streamlit-based visualization capabilities:
 ## Pipeline Workflow Diagram
 
 ```
-+-------------------+      +---------------------------
-```
-|  BO Composition   | ---> |  Reinforcement Learning   |
++-------------------+      +---------------------------+
+|  Composition BO   | ---> |  Reinforcement Learning   |
 | (Gaussian Process)| <--- |     (SAC Fine-tuning)     |
 +-------------------+      +---------------------------+
-^                              |
-|                              v
-+-------------------+
-|  Physics-Informed | ---> |    Fabrication Process    |
-| Surrogate Network |      | (Spin Speed, Annealing.) |
+         ^                              |
+         |                              v
 +-------------------+      +---------------------------+
-
----
+|  Physics-Informed | ---> |    Fabrication Process    |
+| Surrogate Network |      | (Spin Speed, Annealing..) |
++-------------------+      +---------------------------+
+```
 
 ## Surrogate Model Validation
 
@@ -151,6 +149,7 @@ High-quality validation provides solid generalization:
 ---
 
 ## Benchmark Results
+Benchmarking results (shown below) demonstrate that our integrated tri-loop framework (BO + RL) consistently outperforms standalone BO, RL, and random search. Over repeated trials, Tri-Loop achieved superior convergence in optimizing efficiency × lifetime product, with statistically robust performance and minimal variance, highlighting the power of coordinated exploration-exploitation in materials discovery.
 
 Detailed visual and tabulated results showcase optimization efficacy:
 ![alt text](<visualization (2).png>)
