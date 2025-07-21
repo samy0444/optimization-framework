@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 from rl_bo_pipeline.physics_informed_bo import PhysicsInformedBO
-# from simulation import simulate_all_phy  # your digital-twin surrogate + PINN wrapper
+# from simulation import simulate_all_phy  # digital-twin surrogate + PINN wrapper
 from simulation_bandgap import simulate_with_bandgap
 from layers import Layer
 # app.py (Streamlit excerpt)
@@ -50,11 +50,11 @@ def run_bo(
         new_pts = bo.suggest(n_candidates=material_batch)  # shape (batch, 3)
         comp_history.append(new_pts)
 
-        # 3) evaluate each suggestion via your digital‐twin simulate_all_phy
+        # 3) evaluate each suggestion via digital‐twin simulate_all_phy
         insts = []
         for cs, ma, fa in new_pts:               # ← use new_pts, not new_CsMAFA
             params = {
-                "layers": default_layers,   # your standard five-layer list
+                "layers": default_layers,   # standard five-layer list
                 # quick‐and‐dirty map first fraction → Pb:
                 "composition": {"Pb": cs, "Sn": 1.0 - cs},
                 "uv_filter": 0.0,
@@ -82,58 +82,3 @@ def run_bo(
 
 
 
-
-
-# # optimization_bo.py (excerpt)
-
-# from physics_informed_bo import PhysicsInformedBO
-# import numpy as np
-# import pandas as pd
-
-# # optimization_bo.py - Updated integration
-
-# def run_bo(num_rounds=5, material_batch=10):
-#     """
-#     Run hierarchical BO using actual MIT data structure
-#     """
-#     # Use actual MIT data
-#     bo = PhysicsInformedBO(
-#         xrd_compositions_csv="cluster-perovskite-data/Data/XRD/xrd_data_compositions.csv",
-#         beta_dft=0.025
-#     )
-    
-#     comp_history, inst_history = [], []
-    
-#     for round_num in range(num_rounds):
-#         print(f"BO Round {round_num + 1}")
-#         comps, insts = bo.run_round(material_batch)
-#         comp_history.append(comps)
-#         inst_history.append(insts)
-        
-#         # Best composition so far
-#         best_idx = np.argmin(bo.y)
-#         best_comp = bo.X[best_idx]
-#         print(f"Best composition: Cs{best_comp[0]:.1f}MA{best_comp[1]:.1f}FA{best_comp[2]:.1f}")
-    
-#     return comp_history, inst_history
-
-# def run_bo(num_iters=20, init_size=20):
-#     # --- Load DFT mix energies ---
-#     dft_df = pd.read_csv('Data/Metadata/dft_data.csv')  # must include ΔG_mix
-#     dft_data = { (r.Cs, r.MA, r.FA): r.delta_G_mix for _,r in dft_df.iterrows() }
-
-#     # --- Instantiate physics‐informed BO ---
-#     bo = PhysicsInformedBO(
-#         composition_space={'Cs':(0,100),'MA':(0,100),'FA':(0,100)},
-#         dft_data=dft_data,
-#         beta_dft=0.025
-#     )
-
-#     # --- Seed with experimental dataset ---
-#     exp_df = pd.read_csv('Data/Metadata/results.csv')
-#     bo.experimental_data['compositions'] = exp_df[['Cs','MA','FA']].values.tolist()
-#     bo.experimental_data['instability_indices'] = exp_df.instability_index.tolist()
-
-#     # --- Run BO-driven composition optimization ---
-#     results = bo.run_optimization(max_rounds=num_iters, batch_size=init_size)
-#     return results

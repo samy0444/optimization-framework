@@ -207,8 +207,8 @@ df_rl = pd.DataFrame(
     index=np.arange(len(Xr_l)),
     columns=life_feat
 )
-# you could fill in some of those 30 if you want, but at minimum pad zeros:
-# df_rl.loc[:, some_stack_feature_cols] = ... (if you had any mapping)
+# we could fill in some of those 30 if we want, but at minimum pad zeros:
+# df_rl.loc[:, some_stack_feature_cols] = ... (if we had any mapping)
 df_rl["log_life"] = yr_l
 print(f"Real life: {len(df_rl)} samples")
 # harmonize, combine

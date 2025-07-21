@@ -103,7 +103,7 @@ if st.sidebar.button("Run Tri-Loop"):
 
 
 
-#     n_repeats    = 5  # or however many you want
+#     n_repeats    = 5  # or however many we want
 if st.sidebar.button("Run Enhanced Benchmarks"):
     st.info("Running robust benchmarking… this may take a minute.")
     start = time.time()

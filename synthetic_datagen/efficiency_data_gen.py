@@ -34,7 +34,7 @@ def sample_stack_base(N, seed=0):
     return np.stack([L_nm, D0, logD0, Ea, E, CTE], axis=2).reshape(N,30)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Build your 32-dim dataset
+# Build 32-dim dataset
 # ──────────────────────────────────────────────────────────────────────────────
 def build_efficiency_dataset_32d(N=50000, seed=42):
     rng = np.random.default_rng(seed)
@@ -54,7 +54,7 @@ def build_efficiency_dataset_32d(N=50000, seed=42):
     eff *= anneal_penalty(ann)
     eff = np.clip(eff, 0.0, 1.0)
 
-    # 4) sample your stack features
+    # 4) sample stack features
     base30 = sample_stack_base(N, seed)
 
     # 5) drop two unneeded stack dims (e.g. indices 6 & 7)

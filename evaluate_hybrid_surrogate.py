@@ -5,7 +5,7 @@ import torch.nn as nn
 import joblib
 from sklearn.metrics import mean_squared_error, r2_score
 
-# ─── use the exact same architecture you trained with ─────────────────────────
+# ─── use the exact same architecture used while training ─────────────────────────
 class BayesianMLP(nn.Module):
     def __init__(self, in_dim, hidden=128, p=0.2):
         super().__init__()

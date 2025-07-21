@@ -17,7 +17,7 @@ def estimate_band_gap(composition: dict) -> float:
 
 # 2) Simulation wrapper that applies bandgap‐based corrections  
 def simulate_with_bandgap(params: dict) -> dict:
-    # run your existing surrogate + interface‐aware sim
+    # run surrogate + interface‐aware sim
     res = simulate_all_phy(params)
     base_eff = res["efficiency"]
     base_life = res["log_lifetime"]
@@ -32,7 +32,7 @@ def simulate_with_bandgap(params: dict) -> dict:
     eff = base_eff * max(penalty, 0.0)
 
     # 4) Lifetime boost for higher bandgap (assumes Eg_MA baseline)
-    # you could replace Eg_MA by a constant or external reference
+    # replace Eg_MA by a constant or external reference
     Eg_MA = 1.60
     life = base_life + 0.1 * (Eg - Eg_MA)
 

@@ -13,7 +13,7 @@ print("CUDA available:", torch.cuda.is_available())
 if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 
-# you can also set these directly on the config
+# we can also set these directly on the config
 dde.config.default_backend   = "pytorch"
 dde.config.default_device_id = 0
 

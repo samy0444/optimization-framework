@@ -53,7 +53,7 @@ class FabricationEnv(gym.Env):
             1: lambda h: -abs(unnorm(h["Pb_frac"],0,1) - 0.5),
             3: lambda h: -abs(unnorm(h["spin_speed"],1000,6000) - 3000)/1000.0,
         }
-        # Any RNG you use in the env should be seeded here:
+        # Any RNG used in the env should be seeded here:
         self._rng = np.random.RandomState()
         self.reset()
 
@@ -136,7 +136,7 @@ class FabricationEnv(gym.Env):
 
         # final simulation call
         params = {
-            "layers": default_layers,  # your standard 5‐layer list of Layer(...)
+            "layers": default_layers,  # standard 5‐layer list of Layer(...)
             "composition": self.fixed_composition,
             "uv_filter":   unnorm(self.history["uv_filter"], 0.0, 1.0),
             "spin_speed":  unnorm(self.history["spin_speed"], 1000.0, 6000.0),
@@ -154,103 +154,8 @@ class FabricationEnv(gym.Env):
                          self.fixed_composition["MA"],
                          self.fixed_composition["FA"]], dtype=np.float32)
         obs  = np.concatenate([base, comp], axis=0)
-        truncated = False    # you don’t have a time limit truncation, so False
+        truncated = False    # don’t have a time limit truncation, so False
 
         return obs, reward, True,truncated, {"result":res}
-
-
-
-# # environment.py
-# import gym
-# import numpy as np
-# from gym import spaces
-# from layers import Layer
-# from simulation import simulate_all
-# from noisy_simulation.noisy_wrapper import NoisySimulator
-
-# def anneal_time_penalty(T):
-#     return min(0.1 * (T / 200.0), 0.1)  # cap penalty
-
-# def unnorm(x, low, high):
-#     return low + (x + 1) * (high - low) / 2
-
-
-# # environment.py
-
-# class FabricationEnv(gym.Env):
-#     def __init__(self, fixed_composition=None):
-#         super().__init__()
-#         self.fixed_composition = fixed_composition  # dict: {"Cs":…, "MA":…, "FA":…}
-
-#         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
-
-#         # **CRUCIAL** so SB3 sees it right away:
-#         # self.action_space = self._action_spaces[0]
-#         # now stage 2 = uv, 3 = spin, 4 = anneal
-#         self.stage_rewards = {
-#             1: lambda h: -abs(h['Pb_frac']   - 0.5),        # composition midpoint
-#             3: lambda h: -abs(h['spin_speed'] - 3000)/1000 # spin ~3000 rpm
-#         }
-#         self.reset()
-
-
-#     def reset(self):
-#         self.stage = 0
-#         self.history = { … }  # as before
-#         # embed also the fixed composition in the observation
-#         comp_obs = [
-#             self.fixed_composition["Cs"],
-#             self.fixed_composition["MA"],
-#             self.fixed_composition["FA"],
-#         ]
-#         return np.concatenate([self._build_base_obs(), comp_obs], axis=0)
-
-#     def step(self, action):
-#         # … your existing mapping from action→history …
-
-#         # Scale normalized [-1, 1] action to real range where needed
-#         a = np.clip(action, -1.0, 1.0)  # safety
-#         self.history['substrate']     = -1.0 if int(round(a[0])) == 0 else 1.0
-#         self.history['Pb_frac']       = a[1]
-#         self.history['uv_filter']     = a[2]
-#         self.history['spin_speed']    = a[3]
-#         self.history['anneal_T']      = a[4]
-#         self.history['encapsulation'] = -1.0 if int(round(a[5])) == 0 else 1.0
-
-#         # Intermediate reward based on unnormalized values
-#         reward = 0.0
-#         history_unnorm = {
-#             'Pb_frac': unnorm(self.history['Pb_frac'], 0.0, 1.0),
-#             'spin_speed': unnorm(self.history['spin_speed'], 1000.0, 6000.0),
-#         }
-#         for s in self.stage_rewards:
-#             reward += self.stage_rewards[s](history_unnorm)
-
-
-#         params = {
-#             "layers": [ … ],  # standard layer stack
-#             "composition": self.fixed_composition,
-#             "uv_filter": (self.history["uv_filter"]+1)/2,
-#             "spin_speed": 3500 + 2500*self.history["spin_speed"],
-#             "anneal_T": 125 + 75*self.history["anneal_T"],
-#             "substrate": "Glass" if self.history["substrate"]<0 else "PET",
-#             "encapsulation": self.history["encapsulation"]>0,
-#         }
-
-#         res = simulate_all(params)
-#         reward = res["efficiency"]*20 + res["log_lifetime"] - 0.05 * res.get("time_cost",0)
-
-#         # append comp back into obs so RL sees it every step
-#         obs_base = self._build_base_obs()
-#         comp_obs  = [
-#             self.fixed_composition["Cs"],
-#             self.fixed_composition["MA"],
-#             self.fixed_composition["FA"],
-#         ]
-#         obs = np.concatenate([obs_base, comp_obs], axis=0)
-
-#         done = True  # one‐shot
-#         return obs, reward, done, {"result":res}
-
 
 
