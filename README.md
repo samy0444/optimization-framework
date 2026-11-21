@@ -1,5 +1,7 @@
 # Autonomous Optimization Framework: Self-Driving Solar Lab for Perovskite Solar Cells
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ---
 
 ## Overview
@@ -154,3 +156,11 @@ Benchmarking results (shown below) demonstrate that our integrated tri-loop fram
 Detailed visual and tabulated results showcase optimization efficacy:
 ![alt text](<visualization (2).png>)
 
+## License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+
+
+## Contact
+
+- **Email**: samriddhi100mit@gmail.com
