@@ -15,18 +15,29 @@ executor returns only the real measured yield of each pick, and any combination
 not in the table counts as a failed experiment, so no value is ever simulated.
 The target is a reaction with at least 95% yield.
 
+**How hard the target is.** Only 19 of the 3,955 reactions (0.48%) reach 95%
+yield; the mean yield is 33%. Picking measured reactions uniformly at random
+without repeats, the expected number of picks until the first such reaction is
+(N + 1) / (K + 1) = 3956 / 20 ≈ 198, and the chance of finding one within 200
+picks is about 63%.
+
 **Setup.** 20 seeds; budget of 200 experiments (10 initial, then 38 rounds of 5).
 
 | Optimizer | Seeds reaching ≥95% | Median experiments | Mean experiments* | Mean best yield |
 |---|---:|---:|---:|---:|
-| `random` | 60% | 58 | 67.3 | 96.1% |
-| `bayesian` | 100% | 20 | 29.0 | 98.6% |
-| `physics_bo` | 100% | 20 | 29.0 | 98.6% |
+| `random` | 60% (12 of 20) | 57.5 | 67.3 | 96.1% |
+| `bayesian` | 100% (20 of 20) | 20.5 | 29.0 | 98.6% |
+| `physics_bo` | 100% (20 of 20) | 20.5 | 29.0 | 98.6% |
 
-\*Averaged over the seeds that reached the target.
+\*Median and mean are taken over the seeds that reached the target.
 
-Both model-based optimizers reach the target in every seed, using **2.3× fewer
-experiments than random search** on average.
+Both model-based optimizers reach the target in every seed, after 29
+experiments on average (worst seed: 108), about 6.8× fewer than the 198 expected
+for random picking. Random search reaches it in 12 of the 20 seeds, in line with
+the 63% predicted above.
+Those 12 seeds need 67.3 experiments on average, and the other 8 use the whole
+200-experiment budget without reaching it. Because the random-search average
+leaves out its failed seeds, it understates the gap.
 
 `physics_bo` and `bayesian` tie exactly here. The dataset is purely
 categorical, so there is no physics model to supply a prior, and with the prior

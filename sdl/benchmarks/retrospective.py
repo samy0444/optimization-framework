@@ -56,6 +56,14 @@ def run(domain_name: str, optimizers: List[str], n_seeds: int, n_initial: int,
     print(f"\n  TIER-1 RETROSPECTIVE VALIDATION on REAL data: '{domain_name}'")
     print(f"  dataset reactions={len(proto._table)}  best measured yield={ds_max:.1f}  "
           f"target>={target_value}  budget={budget} experiments  seeds={n_seeds}")
+    # Baseline from the data alone: picking measured reactions uniformly at
+    # random without repeats, the expected number of picks until the first one
+    # at or above target is (N + 1) / (K + 1).
+    n_total = len(proto._table)
+    n_at_target = sum(v >= target_value for v in proto._table.values())
+    random_expected = (n_total + 1) / (n_at_target + 1)
+    print(f"  reactions at or above target={n_at_target} ({100 * n_at_target / n_total:.2f}%)  "
+          f"expected random picks to find one={random_expected:.0f}")
     if use_prior:
         print(f"  physics_bo warm-started from a historical prior "
               f"({int(prior_fraction*100)}% of the table)")
@@ -91,21 +99,32 @@ def run(domain_name: str, optimizers: List[str], n_seeds: int, n_initial: int,
         avg_s = f"{avg:.1f}" if avg is not None else "-"
         print(f"  {opt_name:<14}{rate*100:>14.0f}%{med_s:>14}{avg_s:>12}{mean(bests):>12.1f}")
 
-    # speedups vs random and vs standard BO (on mean experiments-to-target)
-    base = results.get("random", {}).get("mean_ett")
-    bo = results.get("bayesian", {}).get("mean_ett")
+    # Ratios of mean experiments-to-target. The means only cover seeds that
+    # reached the target, so a ratio is only a fair comparison when both
+    # optimizers reached it in every seed; otherwise report the reach rates.
+    def _compare(name, r, ref_name):
+        ref = results.get(ref_name)
+        if not ref or not r["mean_ett"] or not ref["mean_ett"]:
+            return
+        if r["reach_rate"] == 1.0 and ref["reach_rate"] == 1.0:
+            print(f"  {name}: {ref['mean_ett'] / r['mean_ett']:.1f}x fewer experiments than {ref_name}")
+        else:
+            print(f"  {name} vs {ref_name}: reached target in {r['reach_rate']*100:.0f}% vs "
+                  f"{ref['reach_rate']*100:.0f}% of seeds (means cover successful seeds only)")
+
     print()
     for opt_name, r in results.items():
-        if r["mean_ett"]:
-            if base:
-                print(f"  {opt_name}: {base / r['mean_ett']:.1f}x fewer experiments than random")
-            if bo and opt_name not in ("random", "bayesian"):
-                print(f"  {opt_name}: {bo / r['mean_ett']:.1f}x fewer experiments than standard BO")
+        if opt_name != "random":
+            _compare(opt_name, r, "random")
+        if opt_name not in ("random", "bayesian"):
+            _compare(opt_name, r, "bayesian")
 
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w") as fh:
         json.dump({"domain": domain_name, "target_value": target_value,
-                   "dataset_max": ds_max, "use_prior": use_prior, "results": results}, fh, indent=2)
+                   "dataset_max": ds_max, "n_at_target": n_at_target,
+                   "random_expected_ett": random_expected,
+                   "use_prior": use_prior, "results": results}, fh, indent=2)
     print(f"\n  saved -> {out_path}\n")
     return results
 
