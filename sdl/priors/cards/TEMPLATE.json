@@ -1,0 +1,21 @@
+{
+  "prior_id": "example_reaction.v1",
+  "reaction_class": "Example: Suzuki-Miyaura coupling",
+  "domain": "reaction",
+  "kind": "mechanistic",
+  "version": 1,
+  "source": "Textbook Arrhenius kinetics; coefficients illustrative, not calibrated.",
+  "description": "Predicts yield and purity from temperature, time, catalyst loading, equivalents, concentration, solvent. Assumes first-order conversion and selectivity that drops with temperature/excess reagent.",
+  "objective": "yield",
+  "n_validation": 0,
+  "rmse": null,
+  "bias": null,
+  "spearman": null,
+  "coverage": null,
+  "reality_gap_notes": "Known to miss: catalyst deactivation at high temperature, solvent-specific impurities, stoichiometry x concentration interactions. These are what the delta-GP learns.",
+  "owner": "your.name@company.com",
+  "status": "draft",
+  "history": [
+    "YYYY-MM-DD: created from template"
+  ]
+}

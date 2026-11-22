@@ -1,0 +1,90 @@
+{
+  "domain": "buchwald",
+  "target_value": 95.0,
+  "dataset_max": 99.99999,
+  "use_prior": false,
+  "results": {
+    "random": {
+      "reach_rate": 0.6,
+      "median_ett": 57.5,
+      "mean_ett": 67.33333333333333,
+      "mean_best": 96.1393379335,
+      "etts": [
+        94,
+        80,
+        21,
+        7,
+        140,
+        130,
+        179,
+        23,
+        3,
+        35,
+        7,
+        89
+      ],
+      "n_seeds": 20,
+      "budget": 200
+    },
+    "bayesian": {
+      "reach_rate": 1.0,
+      "median_ett": 20.5,
+      "mean_ett": 29,
+      "mean_best": 98.569604718,
+      "etts": [
+        27,
+        14,
+        108,
+        15,
+        16,
+        63,
+        7,
+        32,
+        62,
+        25,
+        31,
+        15,
+        12,
+        3,
+        52,
+        14,
+        12,
+        7,
+        34,
+        31
+      ],
+      "n_seeds": 20,
+      "budget": 200
+    },
+    "physics_bo": {
+      "reach_rate": 1.0,
+      "median_ett": 20.5,
+      "mean_ett": 29,
+      "mean_best": 98.569604718,
+      "etts": [
+        27,
+        14,
+        108,
+        15,
+        16,
+        63,
+        7,
+        32,
+        62,
+        25,
+        31,
+        15,
+        12,
+        3,
+        52,
+        14,
+        12,
+        7,
+        34,
+        31
+      ],
+      "n_seeds": 20,
+      "budget": 200
+    }
+  }
+}

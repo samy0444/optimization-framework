@@ -1,0 +1,17 @@
+# Perovskite application (applications/perovskite/)
+# Versions below are the ones this code was developed with (Python 3.8).
+numpy>=1.24
+pandas>=1.5
+scipy>=1.10
+scikit-learn>=1.3
+joblib>=1.4
+torch>=2.0
+botorch>=0.8
+gpytorch>=1.11
+deepxde>=1.10
+gymnasium>=0.29
+stable-baselines3>=2.0
+streamlit>=1.25
+altair>=5.0
+matplotlib>=3.7
+tqdm>=4.66

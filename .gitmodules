@@ -1,6 +1,6 @@
 [submodule "cluster-perovskite-data"]
-	path = cluster-perovskite-data
+	path = applications/perovskite/cluster-perovskite-data
 	url = https://github.com/PV-Lab/cluster-perovskite-data.git
 [submodule "perovskitedatabase_data"]
-	path = perovskitedatabase_data
+	path = applications/perovskite/perovskitedatabase_data
 	url = https://github.com/Jesperkemist/perovskitedatabase_data.git

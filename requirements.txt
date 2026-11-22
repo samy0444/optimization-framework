@@ -1,0 +1,18 @@
+# Core engine (sdl/) — required
+numpy>=1.23
+scipy>=1.9
+scikit-learn>=1.1
+
+# RL and hybrid BO+RL optimizers (optional; without these, `rl` and `hybrid`
+# fall back to random proposals)
+gymnasium>=0.29
+stable-baselines3>=2.0
+torch>=2.0
+
+# HTTP API (optional)
+fastapi>=0.104
+uvicorn>=0.24
+pydantic>=1.10
+
+# Tests
+pytest>=7.0

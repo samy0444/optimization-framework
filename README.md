@@ -1,166 +1,144 @@
-# Autonomous Optimization Framework: Self-Driving Solar Lab for Perovskite Solar Cells
+# Optimization Framework
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+A closed-loop optimization engine for problems where every experiment is
+expensive: it proposes experiments, runs them, learns from the results and
+proposes the next batch. The engine is domain-agnostic. A field plugs in by
+describing its parameters, its objectives and, optionally, a cheap
+physics-based prior, and the same optimizers then run on it unchanged.
 
----
+The repository has two parts:
 
-## Overview
+| Path | What it is |
+|---|---|
+| [`sdl/`](sdl) | The domain-agnostic engine: core loop, optimizers, domains, benchmarks, CLI and HTTP API |
+| [`tests/`](tests) | Unit and integration tests for the engine |
+| [`results/`](results) | Raw JSON from the benchmark runs reported below |
+| [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) | Benchmark setups, full results and caveats |
+| [`applications/perovskite/`](applications/perovskite) | An earlier perovskite solar-cell application: Bayesian optimization for composition plus a reinforcement-learning agent for fabrication settings |
 
-This repository contains an advanced, autonomous optimization platform intended for perovskite solar cell production. It combines state-of-the-art methods like physics-informed surrogate modeling, Bayesian optimization (BO), reinforcement learning (RL), and generative AI to mimic a self-driving laboratory. The platform automatically finds best, stable, and high-efficiency solar cell compositions and production processes, greatly speeding up discovery and development.
-
----
-
-## Repository Structure
+## How the engine works
 
 ```
-├── app.py                      # Streamlit UI for interactive optimization and benchmarking
-├── layers.py                   # Solar cell layer properties and configurations
-├── interfaces.py               # Recombination parameters for the interface
-├── simulation.py               # Physics-informed surrogate simulation model
-├── benchmark_rl_bo.py          # Resilient benchmarking script comparing various optimization approaches
-├── train_base_agent_rl_bo.py   # Reinforcement learning agents trained on typical solar cell compositions
-├── rl_bo_pipeline/
-│   ├── tri_loop.py             # Tri-level optimization loop (BO-RL integration)
-│   ├── physics_informed_bo.py  # Bayesian optimization aided by physics-informed surrogates
-│   ├── evaluate_fixed_comp.py  # Test of RL agents on fixed compositions
-├── data
-│   ├── cluster-perovskite-data # MIT comprehensive experimental dataset
-│   ├── perovskitedatabase_data # Literature-based dataset (NREL)
-│   └── heldout_testdata        # Surrogate model independent validation dataset
-├── models/
-│   ├── surrogate.pt            # Pre-trained surrogate checkpoint
-│   ├── hybrid_efficiency_surrogate.pt    # Efficiency surrogate model
-│   └── hybrid_lifetime_surrogate.pt      # Lifetime surrogate model
-├── results/
-│   └── benchmark_results.csv   # Detailed benchmarking outcomes
-└── train_hybrid_surrogate.py   # Complete training pipeline for surrogate models
+            ┌──────────────── Domain ────────────────┐
+            │ parameter space · objectives · prior   │
+            └────────────────────────────────────────┘
+                                │
+   propose (Optimizer) ──► run (Executor) ──► observe ──► update ──┐
+          ▲                                                       │
+          └───────────────────────────────────────────────────────┘
 ```
 
----
+- **Domain** ([`sdl/core/domain.py`](sdl/core/domain.py)): declares the
+  parameter space (continuous and categorical), the objectives and an optional
+  `simulate()` prior, which is a cheap physics or analytic model of the outcome.
+- **Objectives** ([`sdl/core/objective.py`](sdl/core/objective.py)): each one has
+  a direction, a weight, an optional target and an optional hard bound. Several
+  objectives are combined by weighted scalarization, and a Pareto-front helper
+  is included.
+- **Orchestrator** ([`sdl/core/orchestrator.py`](sdl/core/orchestrator.py)):
+  space-filling exploration, then optimizer-driven iterations, then replicates
+  of the best candidate. It stops early once every objective target is met.
+- **Executors**: `simulation` evaluates a domain's ground truth with optional
+  noise. `tabular` looks up real measured outcomes from a dataset and reports a
+  failed experiment for anything not in the table, so it never invents a value.
 
-## Key Contributions & Workflow
+### Optimizers
 
-### 1. Physics-Informed Surrogate Modeling
+| Name | Method |
+|---|---|
+| `random` | Uniform random sampling (baseline) |
+| `bayesian` | Gaussian-process regression (scikit-learn) with Expected Improvement, Upper Confidence Bound or Thompson sampling, maximised over a large candidate pool |
+| `physics_bo` | Bayesian optimization on the residual between observations and the domain's prior: the model is `prior(x) + GP_residual(x)`, so data is spent only on what the prior gets wrong ([`sdl/optimizers/physics_bo.py`](sdl/optimizers/physics_bo.py)) |
+| `rl` | Soft Actor-Critic (stable-baselines3) trained on a surrogate fit to the campaign history, so policy training uses no real experiments |
+| `hybrid` | Splits each batch between Bayesian optimization and the SAC policy, shifting towards RL as data accumulates |
 
-* **Objective:** Cost-effective prediction of solar cell efficiency and lifetime without extensive experiments.
-* **Features:** Composition, layer structures, process parameters (spin speed, annealing temperature, encapsulation).
-* **Outputs:** Estimated cell efficiency and stability (log-lifetime).
-* **Methodology:** High-performance neural network surrogate, which was trained on synthetic physics simulations (SCAPS, Quantum ESPRESSO proxies) and tested against experimental MIT datasets.
+`rl` and `hybrid` fall back to random proposals if stable-baselines3 and
+gymnasium are not installed.
 
-### 2. Bayesian Optimization (BO)
+### Domains
 
-* **Objective:** Methodically scan new compositions to discover promising candidates.
-* **Method:**
+| Name | Type | Objectives |
+|---|---|---|
+| `buchwald` | **Real data**: 3,955 measured Buchwald–Hartwig reactions (4 categorical factors) | yield |
+| `reaction` | Simulated reaction: an Arrhenius-style prior plus a deliberate "reality gap" in the ground truth | yield, purity |
+| `perovskite` | Simulated solar cell: a physics prior for bandgap, Jsc, Voc, fill factor and a stability proxy | efficiency, T80 |
+| `branin` | Branin test function as the prior; the ground truth adds a bias well, so the true optimum is misranked by the prior | branin value |
 
-  * Gaussian Process regression with focused acquisition functions (e.g., Expected Improvement).
-  * Use of physics-informed priors to make more realistic prediction abilities.
+Adding a field means writing one `Domain` subclass. [`sdl/domains/branin.py`](sdl/domains/branin.py)
+is a complete example in about 60 lines.
 
-### 3. Reinforcement Learning (RL)
+## Results
 
-* **Goal:** Accurately optimize fabrication parameters (e.g., spin coating rate, annealing temperature).
-* **Procedure:** Soft Actor-Critic (SAC) algorithm learned on compositions proposed by BO to maximize efficiency × lifetime.
+All results come from simulation or from replaying a real published dataset.
+None is a live lab result. Full setups and per-optimizer numbers are in
+[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
-### 4. Integrated Tri-Loop Optimization
+**Real data: replaying 3,955 measured Buchwald–Hartwig reactions** (20 seeds,
+target ≥ 95% yield, budget 200 experiments):
 
-* Iterative feedback loop: Bayesian optimization proposes compositions → Reinforcement learning optimizes fabrication processes → Surrogate evaluation guides next optimization cycles.
-* Progressive autonomous refinement and continuous improvement toward stable, high-efficiency solar cells.
+| Optimizer | Seeds reaching target | Mean experiments to target |
+|---|---:|---:|
+| `random` | 60% | 67.3 |
+| `bayesian` | 100% | 29.0 |
+| `physics_bo` | 100% | 29.0 |
 
----
+Bayesian optimization reaches the target in every seed with 2.3× fewer
+experiments than random search. `physics_bo` ties standard BO here because the
+dataset is categorical, so there is no physics prior to use.
 
-## Installation
+**Simulation: a reaction whose ground truth deviates from its kinetic prior**
+(5 seeds, budget 51 experiments): `physics_bo` meets both the yield (≥ 90%) and
+purity (≥ 99%) targets in 3 of 5 seeds, in as few as 9 experiments. Standard
+Bayesian optimization and random search meet them in none.
 
-Clone the repository and install dependencies:
+## Quick start
+
+Python 3.8 or later.
 
 ```bash
-git clone https://github.com/samy0444/optimization-framework.git
-cd optimization-framework
 pip install -r requirements.txt
+python -m pytest -q tests/
+
+python -m sdl.cli list                                    # registered domains, optimizers, executors
+python -m sdl.cli run --domain branin --optimizer bayesian --iterations 20
+python -m sdl.cli run --domain perovskite --optimizer hybrid --iterations 10
+python -m sdl.demo                                        # compare optimizers on one domain
+
+uvicorn sdl.api.app:app --port 8000                       # HTTP API; docs at http://localhost:8000/docs
 ```
 
----
-
-## Usage
-
-Launch the interactive Streamlit dashboard:
+Reproduce the benchmarks:
 
 ```bash
-streamlit run app.py
+python -m sdl.benchmarks.retrospective --seeds 20 --out results/retro_buchwald.json
+python -m sdl.benchmarks.runner --domain reaction --optimizers random bayesian physics_bo \
+    --seeds 0 1 2 3 4 --iterations 15 --batch 3 --initial 6 --noise 0.01 \
+    --out results/bench_reaction.json
 ```
 
-### Dashboard Capabilities
+## Perovskite application
 
-* **Manual Simulation:** Quickly evaluate individual solar cell recipes.
-* **Automated Optimization:** Run autonomous optimization loops based on BO and RL.
-* **Comprehensive Benchmarking:** Run statistical and visual examination of various optimization approaches.
+[`applications/perovskite/`](applications/perovskite) is the project this engine
+grew out of: a two-level loop in which a Gaussian process (BoTorch) proposes
+Cs/FA/MA compositions from MIT PV-Lab degradation data, a Soft Actor-Critic
+agent tunes six fabrication settings for each composition, and neural-network
+surrogates score the results. It also includes a DeepXDE physics-informed
+neural network used to generate synthetic lifetime data. See its
+[README](applications/perovskite/README.md) for setup, surrogate accuracy and
+known limitations.
 
----
+## Data
 
-## Robust Benchmarking
-
-The benchmarking rigorously compares optimization strategies to ensure statistical significance and robustness:
-
-* Random Search
-* Bayesian Optimization (BO-only)
-* Reinforcement Learning (RL-only)
-* Tri-Loop Optimization (BO+RL)
-
-### Benchmark Methodology
-
-* Make several independent repetitions for robust statistics.
-* Report mean performance, standard deviation, and statistical significance test (t-tests).
-* Measures: convergence rate, realized efficiency, and lifetime stability.
-
-### Benchmark Visualization
-
-Streamlit-based visualization capabilities:
-
-* Error-band convergence plots.
-* Statistical comparison and significance tests.
-* Analysis of cycles-to-threshold performance.
-
----
-
-
-## Pipeline Workflow Diagram
-
-```
-+-------------------+      +---------------------------+
-|  Composition BO   | ---> |  Reinforcement Learning   |
-| (Gaussian Process)| <--- |     (SAC Fine-tuning)     |
-+-------------------+      +---------------------------+
-         ^                              |
-         |                              v
-+-------------------+      +---------------------------+
-|  Physics-Informed | ---> |    Fabrication Process    |
-| Surrogate Network |      | (Spin Speed, Annealing..) |
-+-------------------+      +---------------------------+
-```
-
-## Surrogate Model Validation
-
-High-quality validation provides solid generalization:
-
-| Surrogate      | RMSE  | R²    |
-| -------------- | ----- | ----- |
-| **Lifetime**   | 0.108 | 0.985 |
-| **Efficiency** | 3.728 | 0.712 |
-
-* **Lifetime surrogate** results in nearly perfect overall generalization with R² \~ 0.99.
-* **Efficiency surrogate** gives stable predictions with RMSE \~3.7% and R² \~ 0.71, considerably high considering inherent experimental volatility.
-
----
-
-## Benchmark Results
-Benchmarking results (shown below) demonstrate that our integrated tri-loop framework (BO + RL) consistently outperforms standalone BO, RL, and random search. Over repeated trials, Tri-Loop achieved superior convergence in optimizing efficiency × lifetime product, with statistically robust performance and minimal variance, highlighting the power of coordinated exploration-exploitation in materials discovery.
-
-Detailed visual and tabulated results showcase optimization efficacy:
-![alt text](<visualization (2).png>)
+- **Buchwald–Hartwig dataset**, included as
+  [`sdl/data/buchwald_hartwig.csv`](sdl/data/buchwald_hartwig.csv): Ahneman,
+  Estrada, Lin, Dreher and Doyle, "Predicting reaction performance in C–N
+  cross-coupling using machine learning," *Science* 360, 186–190 (2018). The
+  authors publish the data in [doylelab/rxnpredict](https://github.com/doylelab/rxnpredict)
+  under the MIT License.
+- Perovskite datasets are linked as git submodules; see the
+  [application README](applications/perovskite/README.md#data).
 
 ## License
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
-
-
-## Contact
-
-- **Email**: samriddhi100mit@gmail.com
+The code is released under the [MIT License](LICENSE). Datasets remain under
+the terms of their original sources.
